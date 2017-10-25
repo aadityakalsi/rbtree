@@ -102,6 +102,7 @@ class rbtree
     {
         auto node = create_nil();
         ::new (static_cast<void*>(&node->m_data)) Data(std::forward<Data>(d));
+        node->set_color(RED);
         return node;
     }
 
