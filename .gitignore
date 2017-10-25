@@ -1,0 +1,8 @@
+# .gitignore for rbtree
+
+.hunter/
+_build/
+_install/
+tests/install/_source
+tests/install/_build
+tests/install/testLog.txt

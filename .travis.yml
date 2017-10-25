@@ -1,0 +1,80 @@
+# travis ci integration
+language: cpp
+
+matrix:
+  include:
+    # linux
+    - os: linux
+      addons:
+        apt:
+          sources:
+            - george-edison55-precise-backports
+            - debian-sid
+          packages:
+            - cmake
+            - cmake-data
+      env:
+        - BUILD_SHARED_LIBS=1 CMAKE_BUILD_TYPE=Debug
+
+    # linux
+    - os: linux
+      addons:
+        apt:
+          sources:
+            - george-edison55-precise-backports
+            - debian-sid
+          packages:
+            - cmake
+            - cmake-data
+      env:
+        - BUILD_SHARED_LIBS=0 CMAKE_BUILD_TYPE=Debug
+
+    # linux
+    - os: linux
+      addons:
+        apt:
+          sources:
+            - george-edison55-precise-backports
+            - debian-sid
+          packages:
+            - cmake
+            - cmake-data
+      env:
+        - BUILD_SHARED_LIBS=1 CMAKE_BUILD_TYPE=RelWithDebInfo
+
+    # linux
+    - os: linux
+      addons:
+        apt:
+          sources:
+            - george-edison55-precise-backports
+            - debian-sid
+          packages:
+            - cmake
+            - cmake-data
+      env:
+        - BUILD_SHARED_LIBS=0 CMAKE_BUILD_TYPE=RelWithDebInfo
+
+    # osx
+    - os: osx
+      env:
+        - BUILD_SHARED_LIBS=1 CMAKE_BUILD_TYPE=Debug
+
+    # osx
+    - os: osx
+      env:
+        - BUILD_SHARED_LIBS=0 CMAKE_BUILD_TYPE=Debug
+
+    # osx
+    - os: osx
+      env:
+        - BUILD_SHARED_LIBS=1 CMAKE_BUILD_TYPE=RelWithDebInfo
+
+    # osx
+    - os: osx
+      env:
+        - BUILD_SHARED_LIBS=0 CMAKE_BUILD_TYPE=RelWithDebInfo
+
+script:
+  - env BUILD_SHARED_LIBS="${BUILD_SHARED_LIBS}" CMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE}" ./tests-install.sh
+  - ls -hlR _install
