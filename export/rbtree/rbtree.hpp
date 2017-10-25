@@ -40,8 +40,7 @@ class rbtree
     bool contains(Data const& x)
     {
         Node* n = nullptr;
-        find_parent(x, n);
-        assert(n == nullptr || (!m_comp(n->data(), x) && !m_comp(x, n->data())));
+        auto p = find_lb(x, n);
         return n != nullptr;
     }
 
@@ -118,7 +117,7 @@ class rbtree
         }
         void set_parent(Node* n)
         {
-            m_parent = (uintptr_t)n;
+            m_parent = ((uintptr_t)n & ~uintptr_t(1));
         }
         void set_right(Node* n)
         {
@@ -157,6 +156,11 @@ class rbtree
     std::size_t m_size;
     Comp m_comp;
     MyAlloc m_alloc;
+
+    bool is_equal(Data const& a, Data const& b) const
+    {
+        return !m_comp(a, b) && !m_comp(b, a);
+    }
 
     Node* create_nil()
     {
@@ -272,24 +276,58 @@ class rbtree
         n->set_parent(nnew);
     }
 
-    Node* find_parent(Data const& x, Node*& next)
+    Node* find_lb(Data const& x, Node*& next) const
     {
         Node* p = nullptr;
         Node* n = m_root;
         if (!n) return nullptr;
-        while (n != m_nil) {
-            auto const& n_data = n->data();
-            if (m_comp(x, n_data) == true) {
+        auto const NIL = m_nil;
+        while (n != NIL) {
+            if (!m_comp(n->data(), x)) {
                 p = n;
                 n = n->left();
-            } else if (m_comp(n_data, x)) {
-                p = n;
-                n = n->right();
             } else {
-                break;
+                n = n->right();
             }
         }
-        next = n == m_nil ? nullptr : n;
+        next = (p == nullptr || p == NIL) ? nullptr : m_comp(x, p->data()) ? nullptr : p;
+        return p;
+    }
+
+    Node* find_parent(Data const& x, Node*& next) const
+    {
+        Node* p = nullptr;
+        Node* n = m_root;
+        auto const NIL = m_nil;
+        if (!n) return nullptr;
+        bool lt = true;
+        while (n != NIL) {
+            p = n;
+            lt = m_comp(x, n->data());
+            n = lt ? n->left() : n->right();
+        }
+        if (lt) {
+            while (p != nullptr && p->parent() != nullptr && p->parent()->left() == p) {
+                p = p->parent();
+            }
+            if (p != nullptr && p->parent() != nullptr && is_equal(p->parent()->data(), x)) {
+                p = p->grandparent();
+            }
+        }
+        if (p && is_equal(p->data(), x)) {
+            p = p->parent();
+        }
+        if (!p) {
+            next = is_equal(m_root->data(), x) ? m_root : nullptr;
+        } else {
+            if (p->left() != NIL && is_equal(p->left()->data(), x)) {
+                next = p->left();
+            } else if (p->right() != NIL && is_equal(p->right()->data(), x)) {
+                next = p->right();
+            } else {
+                next = nullptr;
+            }
+        }
         return p;
     }
 
@@ -298,6 +336,7 @@ class rbtree
     {
         std::unique_ptr<Node*[]> buf(new Node*[m_size]);
         std::unique_ptr<int[]> lvls(new int[m_size]);
+        auto const NIL = m_nil;
         std::size_t idx = 0;
         std::size_t end = 1;
         std::size_t cur = 0;
@@ -305,10 +344,10 @@ class rbtree
         lvls[0] = 1;
         while (1) {
             auto n = buf[idx++];
-            if (n->left() != m_nil) {
+            if (n->left() != NIL) {
                 buf[end++] = n->left();
             }
-            if (n->right() != m_nil) {
+            if (n->right() != NIL) {
                 buf[end++] = n->right();
             }
             if (end >= m_size) {
@@ -338,13 +377,14 @@ class rbtree
         std::unique_ptr<Node*[]> buf(new Node*[m_size]);
         std::size_t idx = 0;
         std::size_t end = 1;
+        auto const NIL = m_nil;
         buf[0] = m_root;
         while (1) {
             auto n = buf[idx++];
-            if (n->left() != m_nil) {
+            if (n->left() != NIL) {
                 buf[end++] = n->left();
             }
-            if (n->right() != m_nil) {
+            if (n->right() != NIL) {
                 buf[end++] = n->right();
             }
             if (end >= m_size) {
@@ -417,7 +457,6 @@ class rbtree
         // nodes went through G before, and now they all go through P.
         parent = node->parent();
         grandparent = node->grandparent();
-        assert(parent != m_nil && grandparent != m_nil);
         if (!parent || !grandparent) return;
         if (node == parent->left()) {
             rotate_right(grandparent);

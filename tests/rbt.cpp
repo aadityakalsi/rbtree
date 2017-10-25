@@ -88,7 +88,7 @@ void rbt1(void)
 void rbt2(void)
 {
     rbtree<int> t;
-    const int N = 100;
+    const int N = 1000;
     for (int i = 0; i < N; ++i) {
         testThat(t.contains(i) == false);
         testThat(t.size() == i);
@@ -107,15 +107,15 @@ template<class T>
 void print_time_taken(T a, T b)
 {
     auto diff = b - a;
-    std::cout << std::chrono::duration<double, std::milli>(diff).count();
+    std::cout << std::chrono::duration<double, std::milli>(diff).count() << " : ";
 }
 
 } // namespace
 
-void rbt3_time(void)
+void rbt3_time_int(void)
 {
     rbtree<int> t;
-    const int N = 1000;
+    const int N = 100000;
     auto a = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < N; ++i) {
         testThat(t.contains(i) == false);
@@ -128,13 +128,12 @@ void rbt3_time(void)
     // t.print();
     std::cout << "rbtree<int>: ";
     print_time_taken(a, b);
-    std::cout << " \n";
 }
 
-void stdset3_time(void)
+void stdset3_time_int(void)
 {
     std::set<int> t;
-    const int N = 1000;
+    const int N = 100000;
     auto end = t.end();
     auto a = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < N; ++i) {
@@ -147,7 +146,42 @@ void stdset3_time(void)
     auto b = std::chrono::high_resolution_clock::now();
     std::cout << "std::set<int>: ";
     print_time_taken(a, b);
-    std::cout << " \n";
+}
+
+void rbt3_time_size(void)
+{
+    rbtree<size_t> t;
+    const size_t N = 100000;
+    auto a = std::chrono::high_resolution_clock::now();
+    for (size_t i = 0; i < N; ++i) {
+        testThat(t.contains(i) == false);
+        testThat(t.size() == i);
+        testThat(t.insert(i) == true);
+        testThat(t.size() == (i+1));
+        testThat(t.contains(i) == true);
+    }
+    auto b = std::chrono::high_resolution_clock::now();
+    // t.print();
+    std::cout << "rbtree<size_t>: ";
+    print_time_taken(a, b);
+}
+
+void stdset3_time_size(void)
+{
+    std::set<size_t> t;
+    const size_t N = 100000;
+    auto end = t.end();
+    auto a = std::chrono::high_resolution_clock::now();
+    for (size_t i = 0; i < N; ++i) {
+        testThat(t.find(i) == end);
+        testThat(t.size() == i);
+        testThat(t.insert(i).second == true);
+        testThat(t.size() == (i+1));
+        testThat(t.find(i) != end);
+    }
+    auto b = std::chrono::high_resolution_clock::now();
+    std::cout << "std::set<size_t>: ";
+    print_time_taken(a, b);
 }
 
 setupSuite(rbt)
@@ -155,14 +189,8 @@ setupSuite(rbt)
     addTest(rbt0);
     addTest(rbt1);
     addTest(rbt2);
-    addTest(stdset3_time);
-    addTest(stdset3_time);
-    addTest(stdset3_time);
-    addTest(stdset3_time);
-    addTest(stdset3_time);
-    addTest(rbt3_time);
-    addTest(rbt3_time);
-    addTest(rbt3_time);
-    addTest(rbt3_time);
-    addTest(rbt3_time);
+    addTest(rbt3_time_int);
+    addTest(rbt3_time_size);
+    addTest(stdset3_time_int);
+    addTest(stdset3_time_size);
 }
