@@ -27,6 +27,7 @@ using namespace containers;
 void rbt0(void)
 {
     rbtree<int> t;
+    testThat(sizeof(t) == 3*sizeof(void*));
 }
 
 setupSuite(rbt)
