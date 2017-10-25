@@ -100,20 +100,16 @@ class rbtree
 
     Node* create_node(Data&& d)
     {
-        auto node = MyAllocTraits::allocate(m_alloc, 1);
-        assert(static_cast<uintptr_t>(node) & 1 == 0);
+        auto node = create_nil();
         ::new (static_cast<void*>(&node->m_data)) Data(std::forward<Data>(d));
-        node->m_color = RED;
-        node->m_parent = 0;
-        node->m_left = node->m_right = nullptr;
         return node;
     }
 
     void destroy_node(Node* node)
     {
         if (!node) return;
-        node->data.~Data();
-        MyAllocTraits::deallocate(m_alloc, node, 1);
+        node->m_data.~Data();
+        destroy_nil(node);
     }
 };
 
