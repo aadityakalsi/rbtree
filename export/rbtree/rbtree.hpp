@@ -117,7 +117,7 @@ class rbtree
         }
         void set_parent(Node* n)
         {
-            m_parent = ((uintptr_t)n & ~uintptr_t(1));
+            m_parent = (uintptr_t)n;
         }
         void set_right(Node* n)
         {
