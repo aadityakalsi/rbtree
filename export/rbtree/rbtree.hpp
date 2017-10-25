@@ -5,6 +5,7 @@
 
 #include <rbtree/exports.h>
 
+#include <iostream>
 #include <cassert>
 #include <cstddef>
 #include <memory>
@@ -31,7 +32,8 @@ class rbtree
     void clear()
     {
         if (m_root) {
-            remove_node(m_root);
+            remove_nodes_under(m_root);
+            m_root = nullptr;
         }
     }
 
@@ -39,7 +41,7 @@ class rbtree
     {
         Node* n = nullptr;
         find_parent(x, n);
-        assert(n != nullptr || (!m_comp(n->data(), x) && !m_comp(x, n->data())));
+        assert(n == nullptr || (!m_comp(n->data(), x) && !m_comp(x, n->data())));
         return n != nullptr;
     }
 
@@ -49,17 +51,17 @@ class rbtree
         auto p = find_parent(x, n);
         if (n) return false;
         n = create_node(x);
-        ++m_size;
         if (!p) {
             m_root = n;
-            return true;
-        }
-        n->set_parent(p);
-        if (m_comp(x, p->data())) {
-            p->set_left(n);
         } else {
-            p->set_right(n);
+            n->set_parent(p);
+            if (m_comp(x, p->data())) {
+                p->set_left(n);
+            } else {
+                p->set_right(n);
+            }
         }
+        insert_rebalance(n);
         return true;
     }
 
@@ -98,7 +100,8 @@ class rbtree
         }
         Node* parent() const
         {
-            return static_cast<Node*>(m_parent);
+            auto ptr = (uintptr_t)m_parent;
+            return (Node*)ptr;
         }
         Node* right() const
         {
@@ -158,7 +161,7 @@ class rbtree
     Node* create_nil()
     {
         auto node = MyAllocTraits::allocate(m_alloc, 1);
-        assert(static_cast<uintptr_t>(node) & 1 == 0);
+        assert((((uintptr_t)node) & 1) == 0);
         node->m_color = BLACK;
         node->m_parent = 0;
         node->m_left = node->m_right = nullptr;
@@ -171,38 +174,60 @@ class rbtree
         MyAllocTraits::deallocate(m_alloc, node, 1);
     }
 
-    Node* create_node(Data const& x)
+    Node* create_post(Node* node)
     {
-        return create_node(Data(x));
-    }
-
-    Node* create_node(Data&& d)
-    {
-        auto node = create_nil();
-        ::new (static_cast<void*>(&node->m_data)) Data(std::forward<Data>(d));
+        ++m_size;
         node->set_color(RED);
         node->set_left(m_nil);
         node->set_right(m_nil);
         return node;
     }
 
+    Node* create_node(Data const& d)
+    {
+        auto node = create_nil();
+        try {
+            ::new (static_cast<void*>(&node->m_data)) Data(d);
+        } catch(...) {
+            destroy_nil(node);
+            throw;
+        }
+        return create_post(node);
+    }
+
+    Node* create_node(Data&& d)
+    {
+        auto node = create_nil();
+        try {
+            ::new (static_cast<void*>(&node->m_data)) Data(std::forward<Data>(d));
+        } catch(...) {
+            destroy_nil(node);
+            throw;
+        }
+        return create_post(node);
+    }
+
     void destroy_node(Node* node)
     {
         if (!node) return;
         node->m_data.~Data();
+        --m_size;
         destroy_nil(node);
     }
 
     // actions
     void rotate_left(Node* n)
     {
+        assert(n != m_nil);
         auto nnew = n->right();
         assert(nnew != m_nil);
 
         // rotate
         n->set_right(nnew->left());
         nnew->set_left(n);
-        n->right()->set_parent(n);
+        if (n->right()) {
+            n->right()->set_parent(n);
+        }
 
         // handle parents
         auto parent = n->parent();
@@ -221,13 +246,16 @@ class rbtree
 
     void rotate_right(Node* n)
     {
+        assert(n != m_nil);
         auto nnew = n->left();
         assert(nnew != m_nil);
 
         // rotate
         n->set_left(nnew->right());
         nnew->set_right(n);
-        n->left()->set_parent(n);
+        if (n->left() != m_nil) {
+            n->left()->set_parent(n);
+        }
 
         // handle parents
         auto parent = n->parent();
@@ -250,29 +278,154 @@ class rbtree
         Node* n = m_root;
         if (!n) return nullptr;
         while (n != m_nil) {
-            bool const is_less = m_comp(x, n->data());
-            if (!m_comp(n->data(), x) && !is_less) {
-                break;
-            } else if (is_less) {
+            auto const& n_data = n->data();
+            if (m_comp(x, n_data) == true) {
                 p = n;
                 n = n->left();
-            } else {
+            } else if (m_comp(n_data, x)) {
                 p = n;
                 n = n->right();
+            } else {
+                break;
             }
         }
         next = n == m_nil ? nullptr : n;
         return p;
     }
 
-    void remove_node(Node* n)
+  public:
+    void print(std::ostream& strm = std::cerr)
     {
-        if (n == m_nil) return;
-        auto l = n->left();
-        auto r = n->right();
-        destroy_node(n);
-        remove_node(l);
-        remove_node(r);
+        std::unique_ptr<Node*[]> buf(new Node*[m_size]);
+        std::unique_ptr<int[]> lvls(new int[m_size]);
+        std::size_t idx = 0;
+        std::size_t end = 1;
+        std::size_t cur = 0;
+        buf[0] = m_root;
+        lvls[0] = 1;
+        while (1) {
+            auto n = buf[idx++];
+            if (n->left() != m_nil) {
+                buf[end++] = n->left();
+            }
+            if (n->right() != m_nil) {
+                buf[end++] = n->right();
+            }
+            if (end >= m_size) {
+                break;
+            }
+            if (idx == lvls[cur]) {
+                lvls[++cur] = end;
+            }
+        }
+        lvls[++cur] = end;
+        idx = 0;
+        cur = 0;
+        while (idx < m_size) {
+            auto num = lvls[cur++];
+            strm << "lvl " << cur << " ";
+            for (int i = idx; i < num; ++i) {
+                strm << (buf[i]->color() == RED ? " r " : " b ") << buf[i]->data();
+            }
+            strm << "\n";
+            idx = num;
+        }
+    }
+
+  private:
+    void remove_nodes_under(Node* n)
+    {
+        std::unique_ptr<Node*[]> buf(new Node*[m_size]);
+        std::size_t idx = 0;
+        std::size_t end = 1;
+        buf[0] = m_root;
+        while (1) {
+            auto n = buf[idx++];
+            if (n->left() != m_nil) {
+                buf[end++] = n->left();
+            }
+            if (n->right() != m_nil) {
+                buf[end++] = n->right();
+            }
+            if (end >= m_size) {
+                break;
+            }
+        }
+        idx = 0;
+        auto const sz = m_size;
+        while (idx < sz) {
+            destroy_node(buf[idx++]);
+        }
+    }
+
+    void insert_rebalance(Node* node)
+    {
+        auto parent = node->parent();
+        if (parent == nullptr) {
+            // node is the new root
+            node->set_color(BLACK);
+            return;
+        }
+        if (parent->color() == BLACK) {
+            // nothing to do.. balanced
+            return;
+        }
+        // parent is red
+        auto grandparent = parent->parent();
+        auto uncle = parent->sibling();
+        //if (!uncle || uncle == m_nil) return;
+        if (!uncle) return;
+        if (uncle->color() == RED) {
+            // If both the parent P and the uncle U are red, then both of them can be
+            // repainted black and the grandparent G becomes red to maintain property:
+            // "all paths from any given node to its leaf nodes contain the same number
+            //  of black nodes"
+            // Since any path through the parent or uncle must pass through the grandparent
+            // the number of black nodes on these paths has not changed. However, the grandparent
+            // G may now violate property: "the root is black" if it is the root or property:
+            // "both children of every red node are black" if it has a red parent.
+            parent->set_color(BLACK);
+            uncle->set_color(BLACK);
+            grandparent->set_color(RED);
+            insert_rebalance(grandparent);
+            return;
+        }
+        // The parent P is red but the uncle U is black. The ultimate goal will be to rotate the parent
+        // node into the grandparent position, but this will not work if the current node is on the "inside"
+        // of the subtree under G (i.e., if N is the left child of the right child of the grandparent or the
+        // right child of the left child of the grandparent). In this case, a left rotation on P that
+        // switches the roles of the current node N and its parent P can be performed. The rotation causes
+        // some paths to pass through the node N where they did not before. It also causes some paths not to
+        // pass through the node P where they did before. However, both of these nodes are red, so property:
+        // "all paths from any given node to its leaf nodes contain the same number of black nodes" is not
+        // violated by the rotation. After this step has been completed, property "both children of every red
+        // node are black" is still violated, but now we can resolve this by continuing to step 2.
+        if (node == grandparent->left()->right()) {
+            rotate_left(parent);
+            node = node->left();
+        } else if (node == grandparent->right()->left()) {
+            rotate_right(parent);
+            node = node->right();
+        }
+        // The current node N is now certain to be on the "outside" of the subtree under G (left of left child
+        // or right of right child). In this case, a right rotation on G is performed; the result is a tree
+        // where the former parent P is now the parent of both the current node N and the former grandparent G.
+        // G is known to be black, since its former child P could not have been red without violating property
+        // "red nodes have only black children". Once the colors of P and G are switched, the resulting tree
+        // satisfies that property. Property "all paths from any given node to its leaf nodes contain the same
+        // number of black nodes" also remains satisfied, since all paths that went through any of these three
+        // nodes went through G before, and now they all go through P.
+        parent = node->parent();
+        grandparent = node->grandparent();
+        assert(parent != m_nil && grandparent != m_nil);
+        if (!parent || !grandparent) return;
+        if (node == parent->left()) {
+            rotate_right(grandparent);
+        } else {
+            rotate_left(grandparent);
+        }
+        parent->set_color(BLACK);
+        grandparent->set_color(RED);
     }
 };
 

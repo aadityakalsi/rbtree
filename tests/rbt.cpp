@@ -4,6 +4,10 @@
 
 #include <rbtree/rbtree.hpp>
 
+#include <chrono>
+#include <iostream>
+#include <set>
+
 #ifdef RBTREE_C_API
 #  define VER_DEF_FOUND 1
 #else
@@ -75,10 +79,90 @@ void rbt1(void)
     testThat(t.contains(0) == true);
     testThat(t.contains(-1) == true);
     testThat(t.contains(1) == true);
+    // clear
+    t.clear();
+    testThat(t.size() == 0);
+    testThat(t.empty());
+}
+
+void rbt2(void)
+{
+    rbtree<int> t;
+    const int N = 100;
+    for (int i = 0; i < N; ++i) {
+        testThat(t.contains(i) == false);
+        testThat(t.size() == i);
+        testThat(t.insert(i) == true);
+        testThat(t.size() == (i+1));
+        testThat(t.contains(i) == true);
+        for (int j = 0; j < N; ++j) {
+            testThat(t.contains(j) == (j <= i));
+        }
+    }
+}
+
+namespace {
+
+template<class T>
+void print_time_taken(T a, T b)
+{
+    auto diff = b - a;
+    std::cout << std::chrono::duration<double, std::milli>(diff).count();
+}
+
+} // namespace
+
+void rbt3_time(void)
+{
+    rbtree<int> t;
+    const int N = 1000;
+    auto a = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < N; ++i) {
+        testThat(t.contains(i) == false);
+        testThat(t.size() == i);
+        testThat(t.insert(i) == true);
+        testThat(t.size() == (i+1));
+        testThat(t.contains(i) == true);
+    }
+    auto b = std::chrono::high_resolution_clock::now();
+    // t.print();
+    std::cout << "rbtree<int>: ";
+    print_time_taken(a, b);
+    std::cout << " \n";
+}
+
+void stdset3_time(void)
+{
+    std::set<int> t;
+    const int N = 1000;
+    auto end = t.end();
+    auto a = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < N; ++i) {
+        testThat(t.find(i) == end);
+        testThat(t.size() == i);
+        testThat(t.insert(i).second == true);
+        testThat(t.size() == (i+1));
+        testThat(t.find(i) != end);
+    }
+    auto b = std::chrono::high_resolution_clock::now();
+    std::cout << "std::set<int>: ";
+    print_time_taken(a, b);
+    std::cout << " \n";
 }
 
 setupSuite(rbt)
 {
     addTest(rbt0);
     addTest(rbt1);
+    addTest(rbt2);
+    addTest(stdset3_time);
+    addTest(stdset3_time);
+    addTest(stdset3_time);
+    addTest(stdset3_time);
+    addTest(stdset3_time);
+    addTest(rbt3_time);
+    addTest(rbt3_time);
+    addTest(rbt3_time);
+    addTest(rbt3_time);
+    addTest(rbt3_time);
 }
