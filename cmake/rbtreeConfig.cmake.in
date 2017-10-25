@@ -1,0 +1,34 @@
+# rbtreeConfig.cmake
+
+# - Config file for the rbtree package
+# It defines the following variables
+#  RBTREE_INCLUDE_DIRS - include directories for rbtree
+#  RBTREE_LIBRARIES    - libraries to link against
+#  RBTREE_EXECUTABLE   - executable if any
+
+# Compute paths
+
+@PACKAGE_INIT@
+
+include("${CMAKE_CURRENT_LIST_DIR}/@PROJECT_NAME@Targets.cmake")
+check_required_components("@PROJECT_NAME@")
+
+## info
+
+macro(msg m)
+  message("  == [@PROJECT_NAME@] ==  ${m}")
+endmacro(msg)
+
+msg("Importing target -> @PROJECT_NAME@")
+set(_is_shared_lib @BUILD_SHARED_LIBS@)
+string(COMPARE EQUAL "${_is_shared_lib}" "0" _is_static_lib)
+if (_is_static_lib)
+  # include dependencies; static libs are linked to their deps publicly
+  set(_deps "@deps@")
+  foreach(_dep ${_deps})
+    string(REPLACE ":" ";" _pkg_name ${_dep})
+    list(GET _pkg_name 0 _pkg_name)
+    msg("Finding dep package -> ${_pkg_name}")
+    find_package(${_pkg_name} CONFIG)
+  endforeach()
+endif()

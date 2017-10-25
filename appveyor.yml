@@ -1,0 +1,28 @@
+environment:
+  PROJ: "c:/projects/rbtree"
+  matrix:
+    - shared: 0
+    - shared: 1
+
+platform:
+  - x86
+  - x64
+
+configuration:
+  - Debug
+  - Release
+
+#build:
+#  # path to Visual Studio solution or project
+#  project: c:/projects/rbtree/_build/INSTALL.vcxproj
+
+# scripts to run before build
+before_build:
+  - echo Running cmake...
+  - cd /d %PROJ%
+  - cmd: if "%platform%"=="x86" bash -c "env GENERATOR='Visual Studio 14' CMAKE_BUILD_TYPE=$configuration BUILD_SHARED_LIBS=$shared ./tests-install.sh"
+  - cmd: if "%platform%"=="x64" bash -c "env GENERATOR='Visual Studio 14 Win64' CMAKE_BUILD_TYPE=$configuration BUILD_SHARED_LIBS=$shared ./tests-install.sh"
+  # success
+  - cmd: if "%shared%"=="0" cd _install && 7z a "../rbtree-%configuration%-%platform%-static.zip" * && cd .. && appveyor PushArtifact "rbtree-%configuration%-%platform%-static.zip"
+  - cmd: if "%shared%"=="1" cd _install && 7z a "../rbtree-%configuration%-%platform%-shared.zip" * && cd .. && appveyor PushArtifact "rbtree-%configuration%-%platform%-shared.zip"
+  - appveyor exit
