@@ -26,6 +26,7 @@ using namespace containers;
 
 void rbt0(void)
 {
+    rbtree<int> t;
 }
 
 setupSuite(rbt)
