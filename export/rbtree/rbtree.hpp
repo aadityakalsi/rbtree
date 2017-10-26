@@ -14,7 +14,7 @@
 namespace containers
 {
 
-enum _node_color
+enum _rbnode_color
 {
     _BLACK = 0,
     _RED = 1
@@ -26,15 +26,15 @@ struct _rbtree_node_base
     _rbtree_node_base* m_left;
     _rbtree_node_base* m_right;
     // access
-    _node_color color() const
+    _rbnode_color color() const
     {
-        return static_cast<_node_color>(m_parent_color & uintptr_t(1));
+        return static_cast<_rbnode_color>(m_parent_color & uintptr_t(1));
     }
     _rbtree_node_base* parent() const
     {
         return (_rbtree_node_base*)(m_parent_color & ~uintptr_t(1));
     }
-    void set_color(_node_color c)
+    void set_color(_rbnode_color c)
     {
         auto par_col = m_parent_color & ~uintptr_t(1);
         par_col |= uintptr_t((c == _RED) ? 1 : 0);
@@ -115,6 +115,134 @@ struct _rbtree_node : public _rbtree_node_base
     _rbtree_node* uncle() const
     {
         return static_cast<_rbtree_node*>(_rbtree_node_base::uncle());
+    }
+};
+
+class RBTREE_API _rbtree_ops
+{
+  public:
+    // diagnostic
+    static bool _verify_rb_alt(_rbtree_node_base* n);
+    static bool _verify_black_ht(_rbtree_node_base* n, size_t& ht);
+  private:
+    // tree operations
+    static void rotate_left(_rbtree_node_base* n, _rbtree_node_base** root)
+    {
+        assert(n != nullptr);
+        auto nnew = n->right();
+        assert(nnew != nullptr);
+
+        // rotate
+        n->set_right(nnew->left());
+        nnew->set_left(n);
+        if (n->right()) {
+            n->right()->set_parent(n);
+        }
+
+        // handle parents
+        auto parent = n->parent();
+        if (parent) {
+            if (parent->right() == n) {
+                parent->set_right(nnew);
+            } else {
+                parent->set_left(nnew);
+            }
+        } else {
+            *root = nnew;
+        }
+        nnew->set_parent(parent);
+        n->set_parent(nnew);
+    }
+
+    static void rotate_right(_rbtree_node_base* n, _rbtree_node_base** root)
+    {
+        assert(n != nullptr);
+        auto nnew = n->left();
+        assert(nnew != nullptr);
+
+        // rotate
+        n->set_left(nnew->right());
+        nnew->set_right(n);
+        if (n->left()) {
+            n->left()->set_parent(n);
+        }
+
+        // handle parents
+        auto parent = n->parent();
+        if (parent) {
+            if (parent->right() == n) {
+                parent->set_right(nnew);
+            } else {
+                parent->set_left(nnew);
+            }
+        } else {
+            *root = nnew;
+        }
+        nnew->set_parent(parent);
+        n->set_parent(nnew);
+    }
+  public:
+    static bool insert_rebalance(_rbtree_node_base* node, _rbtree_node_base** root)
+    {
+        auto parent = node->parent();
+        if (parent == nullptr) {
+            node->set_color(_BLACK);
+            return false;
+        }
+        if (parent->color() == _BLACK) return false;
+        auto grandparent = parent->parent();
+        if (!grandparent) return false;
+        auto uncle = parent->sibling();
+        if (uncle && uncle->color() == _RED) {
+            // If both the parent P and the uncle U are _RED, then both of them can be
+            // repainted _BLACK and the grandparent G becomes _RED to maintain property:
+            // "all paths from any given node to its leaf nodes contain the same number
+            //  of _BLACK nodes"
+            // Since any path through the parent or uncle must pass through the grandparent
+            // the number of _BLACK nodes on these paths has not changed. However, the grandparent
+            // G may now violate property: "the root is _BLACK" if it is the root or property:
+            // "both children of every _RED node are _BLACK" if it has a _RED parent.
+            parent->set_color(_BLACK);
+            uncle->set_color(_BLACK);
+            grandparent->set_color(_RED);
+            return true;
+        }
+        // The parent P is _RED but the uncle U is _BLACK. The ultimate goal will be to rotate the parent
+        // node into the grandparent position, but this will not work if the current node is on the "inside"
+        // of the subtree under G (i.e., if N is the left child of the right child of the grandparent or the
+        // right child of the left child of the grandparent). In this case, a left rotation on P that
+        // switches the roles of the current node N and its parent P can be performed. The rotation causes
+        // some paths to pass through the node N where they did not before. It also causes some paths not to
+        // pass through the node P where they did before. However, both of these nodes are _RED, so property:
+        // "all paths from any given node to its leaf nodes contain the same number of _BLACK nodes" is not
+        // violated by the rotation. After this step has been completed, property "both children of every _RED
+        // node are _BLACK" is still violated, but now we can resolve this by continuing to step 2.
+        if (grandparent->left() && node == grandparent->left()->right()) {
+            rotate_left(parent, root);
+            node = node->left();
+        } else if (grandparent->right() && node == grandparent->right()->left()) {
+            rotate_right(parent, root);
+            node = node->right();
+        }
+        // The current node N is now certain to be on the "outside" of the subtree under G (left of left child
+        // or right of right child). In this case, a right rotation on G is performed; the result is a tree
+        // where the former parent P is now the parent of both the current node N and the former grandparent G.
+        // G is known to be _BLACK, since its former child P could not have been _RED without violating property
+        // "_RED nodes have only _BLACK children". Once the colors of P and G are switched, the resulting tree
+        // satisfies that property. Property "all paths from any given node to its leaf nodes contain the same
+        // number of _BLACK nodes" also remains satisfied, since all paths that went through any of these three
+        // nodes went through G before, and now they all go through P.
+        parent = node->parent();
+        grandparent = node->grandparent();
+        if (!parent || !grandparent) return false;
+        if (node == parent->left()) {
+            rotate_right(grandparent, root);
+        } else {
+            rotate_left(grandparent, root);
+        }
+        parent->set_color(_BLACK);
+        grandparent->set_color(_RED);
+        return false;
     }
 };
 
@@ -216,163 +344,22 @@ struct _rbtree_base : public _rbtree_base_alloc<Data, Alloc>
         _destroy_node_common(node);
     }
 
-    // tree operations
-    void rotate_left(_node* n)
+  private:
+    static void _print_node(_node* n, int lvl)
     {
-        assert(n != nullptr);
-        auto nnew = n->right();
-        assert(nnew != nullptr);
-
-        // rotate
-        n->set_right(nnew->left());
-        nnew->set_left(n);
-        if (n->right()) {
-            n->right()->set_parent(n);
+        if (!n) return;
+        for (int i = 0; i < lvl; ++i) {
+            std::cerr << "  ";
         }
-
-        // handle parents
-        auto parent = n->parent();
-        if (parent) {
-            if (parent->right() == n) {
-                parent->set_right(nnew);
-            } else {
-                parent->set_left(nnew);
-            }
-        } else {
-            m_root = nnew;
-        }
-        nnew->set_parent(parent);
-        n->set_parent(nnew);
+        std::cerr << "|-> (" << (n->color() == _RED ? "r" : "b") << ") " << n->data() << "\n";
+        _print_node(n->left(), lvl + 1);
+        _print_node(n->right(), lvl + 1);
     }
-
-    void rotate_right(_node* n)
-    {
-        assert(n != nullptr);
-        auto nnew = n->left();
-        assert(nnew != nullptr);
-
-        // rotate
-        n->set_left(nnew->right());
-        nnew->set_right(n);
-        if (n->left()) {
-            n->left()->set_parent(n);
-        }
-
-        // handle parents
-        auto parent = n->parent();
-        if (parent) {
-            if (parent->right() == n) {
-                parent->set_right(nnew);
-            } else {
-                parent->set_left(nnew);
-            }
-        } else {
-            m_root = nnew;
-        }
-        nnew->set_parent(parent);
-        n->set_parent(nnew);
-    }
-
-    bool insert_rebalance(_node* node)
-    {
-        auto parent = node->parent();
-        if (parent == nullptr) {
-            node->set_color(_BLACK);
-            return false;
-        }
-        if (parent->color() == _BLACK) return false;
-        auto grandparent = parent->parent();
-        if (!grandparent) return false;
-        auto uncle = parent->sibling();
-        if (uncle && uncle->color() == _RED) {
-            // If both the parent P and the uncle U are _RED, then both of them can be
-            // repainted _BLACK and the grandparent G becomes _RED to maintain property:
-            // "all paths from any given node to its leaf nodes contain the same number
-            //  of _BLACK nodes"
-            // Since any path through the parent or uncle must pass through the grandparent
-            // the number of _BLACK nodes on these paths has not changed. However, the grandparent
-            // G may now violate property: "the root is _BLACK" if it is the root or property:
-            // "both children of every _RED node are _BLACK" if it has a _RED parent.
-            parent->set_color(_BLACK);
-            uncle->set_color(_BLACK);
-            grandparent->set_color(_RED);
-            return true;
-        }
-        // The parent P is _RED but the uncle U is _BLACK. The ultimate goal will be to rotate the parent
-        // node into the grandparent position, but this will not work if the current node is on the "inside"
-        // of the subtree under G (i.e., if N is the left child of the right child of the grandparent or the
-        // right child of the left child of the grandparent). In this case, a left rotation on P that
-        // switches the roles of the current node N and its parent P can be performed. The rotation causes
-        // some paths to pass through the node N where they did not before. It also causes some paths not to
-        // pass through the node P where they did before. However, both of these nodes are _RED, so property:
-        // "all paths from any given node to its leaf nodes contain the same number of _BLACK nodes" is not
-        // violated by the rotation. After this step has been completed, property "both children of every _RED
-        // node are _BLACK" is still violated, but now we can resolve this by continuing to step 2.
-        if (grandparent->left() && node == grandparent->left()->right()) {
-            rotate_left(parent);
-            node = node->left();
-        } else if (grandparent->right() && node == grandparent->right()->left()) {
-            rotate_right(parent);
-            node = node->right();
-        }
-        // The current node N is now certain to be on the "outside" of the subtree under G (left of left child
-        // or right of right child). In this case, a right rotation on G is performed; the result is a tree
-        // where the former parent P is now the parent of both the current node N and the former grandparent G.
-        // G is known to be _BLACK, since its former child P could not have been _RED without violating property
-        // "_RED nodes have only _BLACK children". Once the colors of P and G are switched, the resulting tree
-        // satisfies that property. Property "all paths from any given node to its leaf nodes contain the same
-        // number of _BLACK nodes" also remains satisfied, since all paths that went through any of these three
-        // nodes went through G before, and now they all go through P.
-        parent = node->parent();
-        grandparent = node->grandparent();
-        if (!parent || !grandparent) return false;
-        if (node == parent->left()) {
-            rotate_right(grandparent);
-        } else {
-            rotate_left(grandparent);
-        }
-        parent->set_color(_BLACK);
-        grandparent->set_color(_RED);
-        return false;
-    }
-
   public:
-    void print(std::ostream& strm = std::cerr)
+    void print() const
     {
-        std::unique_ptr<_node*[]> buf(new _node*[m_size]);
-        std::unique_ptr<int[]> lvls(new int[m_size]);
-        std::size_t idx = 0;
-        std::size_t end = 1;
-        std::size_t cur = 0;
-        buf[0] = m_root;
-        lvls[0] = 1;
-        while (1) {
-            auto n = buf[idx++];
-            if (n->left() != nullptr) {
-                buf[end++] = n->left();
-            }
-            if (n->right() != nullptr) {
-                buf[end++] = n->right();
-            }
-            if (end >= m_size) {
-                break;
-            }
-            if (idx == lvls[cur]) {
-                lvls[++cur] = end;
-            }
-        }
-        lvls[++cur] = end;
-        idx = 0;
-        cur = 0;
-        while (idx < m_size) {
-            auto num = lvls[cur++];
-            strm << "lvl " << cur << " ";
-            for (int i = idx; i < num; ++i) {
-                strm << (buf[i]->color() == _RED ? " r " : " b ") << buf[i]->data();
-            }
-            strm << "\n";
-            idx = num;
-        }
+        std::cerr << "\n";
+        _print_node(m_root, 0);
     }
 
   protected:
@@ -404,35 +391,15 @@ struct _rbtree_base : public _rbtree_base_alloc<Data, Alloc>
     bool verify() const
     {
         if (!m_root) return true;
-        bool const rbalt = _verify_rb_alt(m_root);
+        bool const rbalt = _rbtree_ops::_verify_rb_alt(m_root);
         size_t lh = 0, rh = 0;
-        bool lv = _verify_black_ht(m_root->left(), lh);
-        bool rv = _verify_black_ht(m_root->right(), rh);
-        return lv && rv && (lh == rh);
-    }
-
-    static bool _verify_rb_alt(_node* n)
-    {
-        if (!n) return true;
-        if (n->color() == _RED) {
-            if (n->left() && n->left()->color() == _RED) return false;
-            if (n->right() && n->right()->color() == _RED) return false;
+        bool lv = _rbtree_ops::_verify_black_ht(m_root->left(), lh);
+        bool rv = _rbtree_ops::_verify_black_ht(m_root->right(), rh);
+        bool const ret = lv && rv && (lh == rh);
+        if (!ret) {
+            print();
         }
-        return _verify_rb_alt(n->left()) && _verify_rb_alt(n->right());
-    }
-
-    static bool _verify_black_ht(_node* n, size_t& ht)
-    {
-        if (!n) {
-            ht = 1;
-            return true;
-        }
-        size_t lh = 0, rh = 0;
-        bool lv = _verify_black_ht(n->left(), lh);
-        bool rv = _verify_black_ht(n->right(), rh);
-        if (!lv || !rv || lh != rh) return false;
-        ht = lh + (n->color() == _BLACK);
-        return true;
+        return ret;
     }
 };
 
@@ -451,6 +418,7 @@ class rbtree : public _rbtree_base<Data, Alloc>
 
     bool insert(Data const& d)
     {
+        assert(this->verify());
         _node* n = nullptr;
         auto p = find_parent(d, n);
         if (n) return false;
@@ -465,7 +433,7 @@ class rbtree : public _rbtree_base<Data, Alloc>
                 p->set_right(n);
             }
         }
-        while (n && this->insert_rebalance(n)) {
+        while (n && _rbtree_ops::insert_rebalance(n, (_rbtree_node_base**)&this->m_root)) {
             n = n->grandparent();
         }
         assert(this->verify());
@@ -507,9 +475,6 @@ class rbtree : public _rbtree_base<Data, Alloc>
             n = lt ? n->left() : n->right();
         }
         if (lt) {
-            while (p != nullptr && p->parent() != nullptr && p->parent()->left() == p) {
-                p = p->parent();
-            }
             if (p != nullptr && p->parent() != nullptr && this->is_equal(p->parent()->data(), x)) {
                 p = p->grandparent();
             }

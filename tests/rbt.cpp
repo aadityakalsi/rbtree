@@ -9,6 +9,9 @@
 #include <iostream>
 #include <set>
 
+#include <string>
+#include <vector>
+
 #ifdef RBTREE_C_API
 #  define VER_DEF_FOUND 1
 #else
@@ -193,6 +196,50 @@ void stdset3_time_size(void)
     print_time_taken(a, b);
 }
 
+void rbt3_time_string(void)
+{
+    rbtree<std::string> t;
+    const size_t N = PERFN;
+    std::vector<std::string> strs;
+    for (size_t i = 0; i < N; ++i) {
+        strs.push_back(std::to_string(i));
+    }
+    auto a = std::chrono::high_resolution_clock::now();
+    for (size_t i = 0; i < N; ++i) {
+        testThat(t.contains(strs[i]) == false);
+        testThat(t.size() == i);
+        testThat(t.insert(strs[i]) == true);
+        testThat(t.size() == (i+1));
+        testThat(t.contains(strs[i]) == true);
+    }
+    auto b = std::chrono::high_resolution_clock::now();
+    // t.print();
+    std::cout << "rbtree<std::string>: ";
+    print_time_taken(a, b);
+}
+
+void stdset3_time_string(void)
+{
+    std::set<std::string> t;
+    const size_t N = PERFN;
+    std::vector<std::string> strs;
+    for (size_t i = 0; i < N; ++i) {
+        strs.push_back(std::to_string(i));
+    }
+    auto a = std::chrono::high_resolution_clock::now();
+    for (size_t i = 0; i < N; ++i) {
+        testThat(t.find(strs[i]) == t.end());
+        testThat(t.size() == i);
+        testThat(t.insert(strs[i]).second == true);
+        testThat(t.size() == (i+1));
+        testThat(t.find(strs[i]) != t.end());
+    }
+    auto b = std::chrono::high_resolution_clock::now();
+    // t.print();
+    std::cout << "rbtree<std::string>: ";
+    print_time_taken(a, b);
+}
+
 //////////////////////////////////////////
 
 setupSuite(rbt)
@@ -201,7 +248,9 @@ setupSuite(rbt)
     addTest(rbt1);
     addTest(rbt2);
     addTest(rbt3_time_int);
-    addTest(rbt3_time_size);
     addTest(stdset3_time_int);
+    addTest(rbt3_time_size);
     addTest(stdset3_time_size);
+    addTest(rbt3_time_string);
+    addTest(stdset3_time_string);
 }
