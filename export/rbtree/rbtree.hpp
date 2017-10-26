@@ -406,7 +406,6 @@ class rbtree : public _rbtree_base<Data, Alloc>
 {
   private:
     using _node = typename _rbtree_base<Data, Alloc>::_node;
-    static bool const _use_copy = std::is_trivially_copyable<Data>::value && sizeof(Data) <= sizeof(void*);
   public:
     bool contains(Data const& d) const
     {
