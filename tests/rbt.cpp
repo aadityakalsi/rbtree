@@ -31,7 +31,7 @@ using namespace containers;
 void rbt0(void)
 {
     rbtree<int> t;
-    testThat(sizeof(t) == 4*sizeof(void*));
+    testThat(sizeof(t) == 3*sizeof(void*));
     testThat(t.size() == 0);
     testThat(t.empty());
 }

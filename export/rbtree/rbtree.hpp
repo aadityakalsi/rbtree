@@ -134,11 +134,6 @@ struct _rbtree_base : public _rbtree_base_alloc<Data, Alloc>
     std::size_t m_size;
 
   public:
-    virtual ~_rbtree_base()
-    {
-        clear();
-    }
-
     void clear()
     {
         if (m_root) {
@@ -160,6 +155,9 @@ struct _rbtree_base : public _rbtree_base_alloc<Data, Alloc>
   protected:
     _rbtree_base() : m_root(nullptr), m_size(0)
     { }
+
+    ~_rbtree_base()
+    { clear(); }
 
     // node creation and deletion
     _node* _create_node_common()
