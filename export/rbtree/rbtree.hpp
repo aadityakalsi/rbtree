@@ -278,17 +278,8 @@ struct _rbtree_base : public _rbtree_base_alloc<Data, Alloc>
     void insert_rebalance(_node* node)
     {
         auto parent = node->parent();
-        if (parent == nullptr) {
-            // node is the new root
-            node->set_color(_BLACK);
-            return;
-        }
-        if (parent->color() == _BLACK) {
-            // nothing to do.. balanced
-            return;
-        }
-        // parent is _RED
         auto grandparent = parent->parent();
+        if (!grandparent) return;
         auto uncle = parent->sibling();
         if (uncle && uncle->color() == _RED) {
             // If both the parent P and the uncle U are _RED, then both of them can be
@@ -302,7 +293,9 @@ struct _rbtree_base : public _rbtree_base_alloc<Data, Alloc>
             parent->set_color(_BLACK);
             uncle->set_color(_BLACK);
             grandparent->set_color(_RED);
-            insert_rebalance(grandparent);
+            if (grandparent->parent() && grandparent->parent()->color() == _RED) {
+                insert_rebalance(grandparent);
+            }
             return;
         }
         // The parent P is _RED but the uncle U is _BLACK. The ultimate goal will be to rotate the parent
@@ -430,6 +423,7 @@ class rbtree : public _rbtree_base<Data, Alloc>
         n = this->create_node(d);
         if (!p) {
             this->m_root = n;
+            n->set_color(_BLACK);
         } else {
             n->set_parent(p);
             if (m_comp(d, p->data())) {
@@ -437,8 +431,10 @@ class rbtree : public _rbtree_base<Data, Alloc>
             } else {
                 p->set_right(n);
             }
+            if (p->color() == _RED) {
+                this->insert_rebalance(n);
+            }
         }
-        this->insert_rebalance(n);
         return true;
     }
 
@@ -450,134 +446,57 @@ class rbtree : public _rbtree_base<Data, Alloc>
         return !m_comp(a, b) && !m_comp(b, a);
     }
 
-    struct _find_lb_cref
-    {
-        static _node* act(rbtree const* that, Data const& x, _node*& next)
-        {
-            _node* p = nullptr;
-            _node* n = that->m_root;
-            while (n != nullptr) {
-                if (!that->m_comp(n->data(), x)) {
-                    p = n;
-                    n = n->left();
-                } else {
-                    n = n->right();
-                }
-            }
-            next = (p == nullptr) ? nullptr : that->m_comp(x, p->data()) ? nullptr : p;
-            return p;
-        }
-    };
-
-    struct _find_lb_copy
-    {
-        static _node* act(rbtree const* that, Data x, _node*& next)
-        {
-            _node* p = nullptr;
-            _node* n = that->m_root;
-            while (n != nullptr) {
-                if (!that->m_comp(n->data(), x)) {
-                    p = n;
-                    n = n->left();
-                } else {
-                    n = n->right();
-                }
-            }
-            next = (p == nullptr) ? nullptr : that->m_comp(x, p->data()) ? nullptr : p;
-            return p;
-        }
-    };
-
     _node* find_lb(Data const& x, _node*& next) const
     {
-        using alg = typename std::conditional<_use_copy, _find_lb_copy, _find_lb_cref>::type;
-        return alg::act(this, x, next);
+        _node* p = nullptr;
+        _node* n = this->m_root;
+        while (n != nullptr) {
+            if (!this->m_comp(n->data(), x)) {
+                p = n;
+                n = n->left();
+            } else {
+                n = n->right();
+            }
+        }
+        next = (p == nullptr) ? nullptr : this->m_comp(x, p->data()) ? nullptr : p;
+        return p;
     }
-
-    struct _find_parent_cref
-    {
-        static _node* act(rbtree const* that, Data const& x, _node*& next)
-        {
-            _node* p = nullptr;
-            _node* n = that->m_root;
-            bool lt = true;
-            while (n != nullptr) {
-                p = n;
-                lt = that->m_comp(x, n->data());
-                n = lt ? n->left() : n->right();
-            }
-            if (lt) {
-                while (p != nullptr && p->parent() != nullptr && p->parent()->left() == p) {
-                    p = p->parent();
-                }
-                if (p != nullptr && p->parent() != nullptr && that->is_equal(p->parent()->data(), x)) {
-                    p = p->grandparent();
-                }
-            }
-            if (p && that->is_equal(p->data(), x)) {
-                p = p->parent();
-            }
-            if (!p) {
-                if (that->m_root) {
-                    next = that->is_equal(that->m_root->data(), x) ? that->m_root : nullptr;
-                }
-            } else {
-                if (p->left()  && that->is_equal(p->left()->data(), x)) {
-                    next = p->left();
-                } else if (p->right() && that->is_equal(p->right()->data(), x)) {
-                    next = p->right();
-                } else {
-                    next = nullptr;
-                }
-            }
-            return p;
-        }
-    };
-
-    struct _find_parent_copy
-    {
-        static _node* act(rbtree const* that, Data x, _node*& next)
-        {
-            _node* p = nullptr;
-            _node* n = that->m_root;
-            bool lt = true;
-            while (n != nullptr) {
-                p = n;
-                lt = that->m_comp(x, n->data());
-                n = lt ? n->left() : n->right();
-            }
-            if (lt) {
-                while (p != nullptr && p->parent() != nullptr && p->parent()->left() == p) {
-                    p = p->parent();
-                }
-                if (p != nullptr && p->parent() != nullptr && that->is_equal(p->parent()->data(), x)) {
-                    p = p->grandparent();
-                }
-            }
-            if (p && that->is_equal(p->data(), x)) {
-                p = p->parent();
-            }
-            if (!p) {
-                if (that->m_root) {
-                    next = that->is_equal(that->m_root->data(), x) ? that->m_root : nullptr;
-                }
-            } else {
-                if (p->left()  && that->is_equal(p->left()->data(), x)) {
-                    next = p->left();
-                } else if (p->right() && that->is_equal(p->right()->data(), x)) {
-                    next = p->right();
-                } else {
-                    next = nullptr;
-                }
-            }
-            return p;
-        }
-    };
 
     _node* find_parent(Data const& x, _node*& next) const
     {
-        using alg = typename std::conditional<_use_copy, _find_parent_copy, _find_parent_cref>::type;
-        return alg::act(this, x, next);
+        _node* p = nullptr;
+        _node* n = this->m_root;
+        bool lt = true;
+        while (n != nullptr) {
+            p = n;
+            lt = this->m_comp(x, n->data());
+            n = lt ? n->left() : n->right();
+        }
+        if (lt) {
+            while (p != nullptr && p->parent() != nullptr && p->parent()->left() == p) {
+                p = p->parent();
+            }
+            if (p != nullptr && p->parent() != nullptr && this->is_equal(p->parent()->data(), x)) {
+                p = p->grandparent();
+            }
+        }
+        if (p && this->is_equal(p->data(), x)) {
+            p = p->parent();
+        }
+        if (!p) {
+            if (this->m_root) {
+                next = this->is_equal(this->m_root->data(), x) ? this->m_root : nullptr;
+            }
+        } else {
+            if (p->left()  && this->is_equal(p->left()->data(), x)) {
+                next = p->left();
+            } else if (p->right() && this->is_equal(p->right()->data(), x)) {
+                next = p->right();
+            } else {
+                next = nullptr;
+            }
+        }
+        return p;
     }
 };
 
