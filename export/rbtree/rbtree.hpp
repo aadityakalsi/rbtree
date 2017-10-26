@@ -395,11 +395,7 @@ struct _rbtree_base : public _rbtree_base_alloc<Data, Alloc>
         size_t lh = 0, rh = 0;
         bool lv = _rbtree_ops::_verify_black_ht(m_root->left(), lh);
         bool rv = _rbtree_ops::_verify_black_ht(m_root->right(), rh);
-        bool const ret = lv && rv && (lh == rh);
-        if (!ret) {
-            print();
-        }
-        return ret;
+        return lv && rv && (lh == rh);
     }
 };
 
@@ -414,6 +410,30 @@ class rbtree : public _rbtree_base<Data, Alloc>
         _node* n;
         find_lb(d, n);
         return n != nullptr;
+    }
+
+    bool insert(Data&& d)
+    {
+        assert(this->verify());
+        _node* n = nullptr;
+        auto p = find_parent(d, n);
+        if (n) return false;
+        n = this->create_node(std::forward<Data>(d));
+        if (!p) {
+            this->m_root = n;
+        } else {
+            n->set_parent(p);
+            if (m_comp(n->data(), p->data())) {
+                p->set_left(n);
+            } else {
+                p->set_right(n);
+            }
+        }
+        while (n && _rbtree_ops::insert_rebalance(n, (_rbtree_node_base**)&this->m_root)) {
+            n = n->grandparent();
+        }
+        assert(this->verify());
+        return true;
     }
 
     bool insert(Data const& d)

@@ -196,7 +196,7 @@ void stdset3_time_size(void)
     print_time_taken(a, b);
 }
 
-void rbt3_time_string(void)
+void rbt3_time_string_move(void)
 {
     rbtree<std::string> t;
     const size_t N = PERFN;
@@ -204,13 +204,14 @@ void rbt3_time_string(void)
     for (size_t i = 0; i < N; ++i) {
         strs.push_back(std::to_string(i));
     }
+    auto cp = strs;
     auto a = std::chrono::high_resolution_clock::now();
     for (size_t i = 0; i < N; ++i) {
         testThat(t.contains(strs[i]) == false);
         testThat(t.size() == i);
-        testThat(t.insert(strs[i]) == true);
+        testThat(t.insert(std::move(strs[i])) == true);
         testThat(t.size() == (i+1));
-        testThat(t.contains(strs[i]) == true);
+        testThat(t.contains(cp[i]) == true);
     }
     auto b = std::chrono::high_resolution_clock::now();
     // t.print();
@@ -218,7 +219,7 @@ void rbt3_time_string(void)
     print_time_taken(a, b);
 }
 
-void stdset3_time_string(void)
+void stdset3_time_string_move(void)
 {
     std::set<std::string> t;
     const size_t N = PERFN;
@@ -226,17 +227,18 @@ void stdset3_time_string(void)
     for (size_t i = 0; i < N; ++i) {
         strs.push_back(std::to_string(i));
     }
+    auto cp = strs;
     auto a = std::chrono::high_resolution_clock::now();
     for (size_t i = 0; i < N; ++i) {
         testThat(t.find(strs[i]) == t.end());
         testThat(t.size() == i);
-        testThat(t.insert(strs[i]).second == true);
+        testThat(t.insert(std::move(strs[i])).second == true);
         testThat(t.size() == (i+1));
-        testThat(t.find(strs[i]) != t.end());
+        testThat(t.find(cp[i]) != t.end());
     }
     auto b = std::chrono::high_resolution_clock::now();
     // t.print();
-    std::cout << "rbtree<std::string>: ";
+    std::cout << "std::set<std::string>: ";
     print_time_taken(a, b);
 }
 
@@ -247,10 +249,10 @@ setupSuite(rbt)
     addTest(rbt0);
     addTest(rbt1);
     addTest(rbt2);
-    addTest(rbt3_time_int);
     addTest(stdset3_time_int);
-    addTest(rbt3_time_size);
+    addTest(rbt3_time_int);
     addTest(stdset3_time_size);
-    addTest(rbt3_time_string);
-    addTest(stdset3_time_string);
+    addTest(rbt3_time_size);
+    addTest(stdset3_time_string_move);
+    addTest(rbt3_time_string_move);
 }
