@@ -184,6 +184,8 @@ void stdset3_time_size(void)
     print_time_taken(a, b);
 }
 
+//////////////////////////////////////////
+
 setupSuite(rbt)
 {
     addTest(rbt0);
