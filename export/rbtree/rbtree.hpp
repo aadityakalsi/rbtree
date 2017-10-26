@@ -34,15 +34,6 @@ struct _rbtree_node_base
     {
         return (_rbtree_node_base*)(m_parent_color & ~uintptr_t(1));
     }
-    _rbtree_node_base* right() const
-    {
-        return m_right;
-    }
-    _rbtree_node_base* left() const
-    {
-        return m_left;
-    }
-    // modify
     void set_color(_node_color c)
     {
         auto par_col = m_parent_color & ~uintptr_t(1);
@@ -54,6 +45,14 @@ struct _rbtree_node_base
         auto n_int = (uintptr_t)n;
         n_int |= (m_parent_color & uintptr_t(1));
         m_parent_color = n_int;
+    }
+    _rbtree_node_base* right() const
+    {
+        return m_right;
+    }
+    _rbtree_node_base* left() const
+    {
+        return m_left;
     }
     void set_right(_rbtree_node_base* n)
     {
