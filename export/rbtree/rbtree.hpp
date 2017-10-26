@@ -273,11 +273,16 @@ struct _rbtree_base : public _rbtree_base_alloc<Data, Alloc>
         n->set_parent(nnew);
     }
 
-    void insert_rebalance(_node* node)
+    bool insert_rebalance(_node* node)
     {
         auto parent = node->parent();
+        if (parent == nullptr) {
+            node->set_color(_BLACK);
+            return false;
+        }
+        if (parent->color() == _BLACK) return false;
         auto grandparent = parent->parent();
-        if (!grandparent) return;
+        if (!grandparent) return false;
         auto uncle = parent->sibling();
         if (uncle && uncle->color() == _RED) {
             // If both the parent P and the uncle U are _RED, then both of them can be
@@ -291,10 +296,7 @@ struct _rbtree_base : public _rbtree_base_alloc<Data, Alloc>
             parent->set_color(_BLACK);
             uncle->set_color(_BLACK);
             grandparent->set_color(_RED);
-            if (grandparent->parent() && grandparent->parent()->color() == _RED) {
-                insert_rebalance(grandparent);
-            }
-            return;
+            return true;
         }
         // The parent P is _RED but the uncle U is _BLACK. The ultimate goal will be to rotate the parent
         // node into the grandparent position, but this will not work if the current node is on the "inside"
@@ -323,7 +325,7 @@ struct _rbtree_base : public _rbtree_base_alloc<Data, Alloc>
         // nodes went through G before, and now they all go through P.
         parent = node->parent();
         grandparent = node->grandparent();
-        if (!parent || !grandparent) return;
+        if (!parent || !grandparent) return false;
         if (node == parent->left()) {
             rotate_right(grandparent);
         } else {
@@ -331,6 +333,7 @@ struct _rbtree_base : public _rbtree_base_alloc<Data, Alloc>
         }
         parent->set_color(_BLACK);
         grandparent->set_color(_RED);
+        return false;
     }
 
   public:
@@ -397,6 +400,40 @@ struct _rbtree_base : public _rbtree_base_alloc<Data, Alloc>
             destroy_node(buf[idx++]);
         }
     }
+
+    bool verify() const
+    {
+        if (!m_root) return true;
+        bool const rbalt = _verify_rb_alt(m_root);
+        size_t lh = 0, rh = 0;
+        bool lv = _verify_black_ht(m_root->left(), lh);
+        bool rv = _verify_black_ht(m_root->right(), rh);
+        return lv && rv && (lh == rh);
+    }
+
+    static bool _verify_rb_alt(_node* n)
+    {
+        if (!n) return true;
+        if (n->color() == _RED) {
+            if (n->left() && n->left()->color() == _RED) return false;
+            if (n->right() && n->right()->color() == _RED) return false;
+        }
+        return _verify_rb_alt(n->left()) && _verify_rb_alt(n->right());
+    }
+
+    static bool _verify_black_ht(_node* n, size_t& ht)
+    {
+        if (!n) {
+            ht = 1;
+            return true;
+        }
+        size_t lh = 0, rh = 0;
+        bool lv = _verify_black_ht(n->left(), lh);
+        bool rv = _verify_black_ht(n->right(), rh);
+        if (!lv || !rv || lh != rh) return false;
+        ht = lh + (n->color() == _BLACK);
+        return true;
+    }
 };
 
 template<class Data, class Comp = std::less<Data>, class Alloc = std::allocator<Data>>
@@ -420,7 +457,6 @@ class rbtree : public _rbtree_base<Data, Alloc>
         n = this->create_node(d);
         if (!p) {
             this->m_root = n;
-            n->set_color(_BLACK);
         } else {
             n->set_parent(p);
             if (m_comp(d, p->data())) {
@@ -428,10 +464,11 @@ class rbtree : public _rbtree_base<Data, Alloc>
             } else {
                 p->set_right(n);
             }
-            if (p->color() == _RED) {
-                this->insert_rebalance(n);
-            }
         }
+        while (n && this->insert_rebalance(n)) {
+            n = n->grandparent();
+        }
+        assert(this->verify());
         return true;
     }
 

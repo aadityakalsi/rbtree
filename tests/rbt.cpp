@@ -5,6 +5,7 @@
 #include <rbtree/rbtree.hpp>
 
 #include <chrono>
+#include <cstdlib>
 #include <iostream>
 #include <set>
 
@@ -110,12 +111,20 @@ void print_time_taken(T a, T b)
     std::cout << std::chrono::duration<double, std::milli>(diff).count() << " : ";
 }
 
+#ifdef NDEBUG
+const size_t PERFN_DEFL = 10000;
+#else
+const size_t PERFN_DEFL = 1000;
+#endif
+
+const size_t PERFN = std::getenv("N") ? std::atoi(std::getenv("N")) : PERFN_DEFL;
+
 } // namespace
 
 void rbt3_time_int(void)
 {
     rbtree<int> t;
-    const int N = 100000;
+    const int N = PERFN;
     auto a = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < N; ++i) {
         testThat(t.contains(i) == false);
@@ -133,7 +142,7 @@ void rbt3_time_int(void)
 void stdset3_time_int(void)
 {
     std::set<int> t;
-    const int N = 100000;
+    const int N = PERFN;
     auto end = t.end();
     auto a = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < N; ++i) {
@@ -151,7 +160,7 @@ void stdset3_time_int(void)
 void rbt3_time_size(void)
 {
     rbtree<size_t> t;
-    const size_t N = 100000;
+    const size_t N = PERFN;
     auto a = std::chrono::high_resolution_clock::now();
     for (size_t i = 0; i < N; ++i) {
         testThat(t.contains(i) == false);
@@ -169,7 +178,7 @@ void rbt3_time_size(void)
 void stdset3_time_size(void)
 {
     std::set<size_t> t;
-    const size_t N = 100000;
+    const size_t N = PERFN;
     auto end = t.end();
     auto a = std::chrono::high_resolution_clock::now();
     for (size_t i = 0; i < N; ++i) {
